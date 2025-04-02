@@ -24,7 +24,14 @@ class State {
         this.modified = false
         for(let i=0; i<this.sinks.length; i++) this.sinks[i].setDirtyFlags()
     }
-    get() { return this.value }
+    get() {
+        if(this.dirty) {
+            const error = new Error("Dirty variable detected. Something went wrong!")
+            error.name = "InternalError"
+            throw error
+        }
+        return this.value
+    }
     addSinks(sink) { this.sinks.push(sink) }
     addSources(source) { this.sources.push(source) }
 }
