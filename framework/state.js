@@ -1,60 +1,82 @@
-export class State {
-    constructor(val = null) {
-        this.value = val
-        this.sinks = []
-        this.sources = []
-        this.dirty = false
-        this.modified = true
+export class Signal {
+    static consumers = []
+    static curent = () => {
+        return Signal.consumers[Signal.consumers.length-1] || null
     }
-    set(val) {
-        if(this.value === val) {
-            this.modified = false
+    static watcher = new Set()
+    static State = class {
+        constructor(val) {
+            this.value = val
+            this.sinks = new Set()
             this.dirty = false
-            return
+            this.node = null
         }
-        this.setDirtyFlags()
-        this.value = val
-        this.dirty = false
-        this.modified = true
-        for(let i=0; i<this.sinks.length; i++) this.sinks[i].update()
-    }
-    setDirtyFlags() {
-        if(this.dirty) return
-        this.dirty = true
-        this.modified = false
-        for(let i=0; i<this.sinks.length; i++) this.sinks[i].setDirtyFlags()
-    }
-    get() {
-        if(this.dirty) {
-            const error = new Error("Dirty variable detected. Something went wrong!")
-            error.name = "InternalError"
-            throw error
+        set(val) {
+            if(this.value === val) return
+            this.makeDirty()
+            if(this.dirty) {
+                this.value = val
+                this.dirty = false
+            }
+            Signal.watcher.forEach(w => { w.get() })
         }
-        return this.value
+        get() {
+            let active = Signal.curent()
+            if(active) {
+                this.sinks.add(active)
+                active.sources.add(this)
+                if(!active.node) active.node = this
+            }
+            return this.value
+        }
+        makeDirty() {
+            this.dirty = true
+            this.sinks.forEach(s => s.makeDirty())
+        }
+        verifyPrimaryNode() {
+            if(this.node && this.node.dirty) {
+                this.node.verifyPrimaryNode()
+                this.makeClean()
+            } else {
+                if(this.dirty) this.makeClean()
+            }
+        }
     }
-    addSinks(sink) { this.sinks.push(sink) }
-    addSources(source) { this.sources.push(source) }
+    static Computed = class extends Signal.State {
+        constructor(callback) {
+            super()
+            this.sources = new Set()
+            this.callback = callback
+            this.dirty = true
+        }
+        get() {
+            let active = Signal.curent()
+            if (active) {
+                this.sinks.add(active);
+                active.sources.add(this);
+                if(!active.node) active.node = this
+            }
+            if (this.dirty) {
+                this.verifyPrimaryNode()
+            }
+            return this.value;
+        }
+        makeClean() {
+            if(!this.dirty) return
+            Signal.consumers.push(this)
+            this.node = null
+            let val = this.callback()
+            if(val === this.value) this.noCalcNeed()
+            this.value = val
+            Signal.consumers.pop()
+            this.dirty = false
+        }
+        noCalcNeed() {
+            this.dirty = false
+            this.sinks.forEach(l => l.noCalcNeed())
+        }
+    }
 }
 
-export class Computed extends State {
-    constructor(callback, sources = []) {
-        super()
-        this.callback = callback
-        this.value = this.callback()
-        for(let i=0; i<sources.length; i++) {
-            this.addSources(sources[i])
-            sources[i].addSinks(this)
-        }
-    }
-    update() {
-        if(!this.dirty) return
-        let stillHasDirtySources = false
-        for(let i=0; i<this.sources.length; i++) if(this.sources[i].dirty) { stillHasDirtySources = true; break }
-        if(stillHasDirtySources) return
-        let sourcesModified = false
-        for(let i=0; i<this.sources.length; i++) if(this.sources[i].modified) { sourcesModified = true; break }
-        let val = (sourcesModified && !this.modified && this.dirty) ? this.callback() : this.value
-        this.set(val)
-        for (let i = 0; i < this.sinks.length; i++) this.sinks[i].update()
-    }
-}
+export const State = Signal.State
+export const Computed = Signal.Computed

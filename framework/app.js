@@ -23,4 +23,4 @@ ${page=="todo" ? todo.get()[0] : ""}
 ${page=="counter" ? counter.get()[0] : ""}
 ${page=="random" ? randomNumSum.get()[0] : ""}
 `, script]
-}, [todo, counter, randomNumSum])
+})

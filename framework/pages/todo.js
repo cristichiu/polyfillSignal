@@ -3,7 +3,7 @@ import { Computed,State } from "../state.js"
 const task = new State("")
 const tasks = new State([])
 
-new Computed(() => { task.set(task.get().replace(/[<>]/, "")) }, [task])
+new Computed(() => { task.set(task.get().replace(/[<>]/, "")) })
 
 export default new Computed(() => {
     function script(){
@@ -23,4 +23,4 @@ export default new Computed(() => {
     ${tasks.get().map(t => { return `<div>${t}</div>` }).join("\n")}
 </div>
 `, script]
-}, [task, tasks])
+})

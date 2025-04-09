@@ -1,8 +1,8 @@
 import app from "./app.js"
-import { Computed, State } from "./state.js"
+import { Computed, State, Signal } from "./state.js"
 
 
-new Computed(() => {
+let a = new Computed(() => {
     const activeElement = document.activeElement;
     let selectionStart, selectionEnd;
     if (activeElement && activeElement.tagName === "INPUT") {
@@ -22,4 +22,6 @@ new Computed(() => {
         }
     }
     return getApp[0]
-}, [app])
+})
+Signal.watcher.add(a)
+a.get()

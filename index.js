@@ -9,6 +9,7 @@ class Signal {
             this.sinks = new Set()
             this.dirty = false
             this.node = null
+            this.modified = true
         }
         set(val) {
             if(this.value === val) return
@@ -16,6 +17,7 @@ class Signal {
             if(this.dirty) {
                 this.value = val
                 this.dirty = false
+                this.modified = true
             }
         }
         get() {
@@ -29,6 +31,7 @@ class Signal {
         }
         makeDirty() {
             this.dirty = true
+            this.modified = false
             this.sinks.forEach(s => s.makeDirty())
         }
         verifyPrimaryNode() {
@@ -46,6 +49,7 @@ class Signal {
             this.sources = new Set()
             this.callback = callback
             this.dirty = true
+            this.modified = false
         }
         get() {
             let active = Signal.curent()
@@ -64,13 +68,21 @@ class Signal {
             Signal.consumers.push(this)
             this.node = null
             let val = this.callback()
-            if(val === this.value) this.noCalcNeed()
-            this.value = val
+            if(val === this.value) {
+                this.sinks.forEach(l => l.noCalcNeed())
+            } else {
+                this.value = val
+                this.modified = true
+            }
             Signal.consumers.pop()
             this.dirty = false
         }
         noCalcNeed() {
+            let foundOneMod = false
+            this.sources.forEach(s => { if(s.modified) { foundOneMod = true; }})
+            if(foundOneMod) return
             this.dirty = false
+            this.modified = false
             this.sinks.forEach(l => l.noCalcNeed())
         }
     }
@@ -126,3 +138,14 @@ class Signal {
 // a.set(1)
 // b.set(2)
 // console.log(display.get())
+
+const a = new Signal.State(0)
+const b = new Signal.Computed(() => { console.log(1); return !(a.get()%2) })
+const c = new Signal.Computed(() => { console.log(2); return b.get() ? "even":"odd" })
+const s = new Signal.Computed(() => {
+    console.log(3)
+    return `${c.get()} is ${a.get()}`
+})
+console.log(s.get())
+a.set(2)
+console.log(s.get())

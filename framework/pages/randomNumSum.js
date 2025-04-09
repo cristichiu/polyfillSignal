@@ -5,12 +5,12 @@ const random1 = new Computed(() => {
     let random = Math.floor(Math.random() * max.get())
     console.log(random)
     return random
-}, [max])
+})
 const random2 = new Computed(() => {
     let random = Math.floor(Math.random() * max.get())
     console.log(random)
     return random
-}, [max])
+})
 
 export default new Computed(() => {
     function script() {
@@ -21,4 +21,4 @@ export default new Computed(() => {
 <div>${random1.get()+random2.get()}</div>
 <button id="but">add</button>
     `, script]
-}, [random1, random2])
+})

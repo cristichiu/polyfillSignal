@@ -18,4 +18,4 @@ export default new Computed(() => {
     <button id="inc2">inc by two</button>
 </div>
 `, script]
-}, [n, result])
+})
