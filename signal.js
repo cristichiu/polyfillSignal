@@ -73,6 +73,7 @@ module.exports = class Signal {
             this.node = null
             let val = this.callback()
             if(val === this.value) {
+                this.dirty = false
                 this.sinks.forEach(l => l.noCalcNeed())
             } else {
                 this.value = val
@@ -83,6 +84,9 @@ module.exports = class Signal {
         }
         noCalcNeed() {
             if(this.sources.intersection(Signal.modified).size) return
+            let foundOneDirty = false
+            this.sources.forEach(s => { if(s.dirty) foundOneDirty = true })
+            if(foundOneDirty) return
             this.dirty = false
             this.modified = false
             this.sinks.forEach(l => l.noCalcNeed())

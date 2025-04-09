@@ -2,6 +2,8 @@ const Signal = require("./signal.js")
 // const { Signal } = require("signal-polyfill")
 
 // const a = new Signal.State(0)
+// const a1 = new Signal.State(0)
+// const a2 = new Signal.Computed(() => a1.get())
 // const b = new Signal.Computed(() => { console.log(1); return !(a.get()%2) })
 // const c = new Signal.Computed(() => { console.log(2); return b.get() ? "even":"odd" })
 // const s = new Signal.Computed(() => {
@@ -10,6 +12,7 @@ const Signal = require("./signal.js")
 // })
 // console.log(s.get())
 // a.set(1)
+// a1.set(3)
 // console.log(s.get())
 
 // const a = new Signal.State(0)
