@@ -1,5 +1,7 @@
 export class Signal {
     static consumers = []
+    static origin = null
+    static modified = new Set()
     static curent = () => {
         return Signal.consumers[Signal.consumers.length-1] || null
     }
@@ -10,7 +12,6 @@ export class Signal {
             this.sinks = new Set()
             this.dirty = false
             this.node = null
-            this.modified = true
         }
         set(val) {
             if(this.value === val) return
@@ -18,9 +19,9 @@ export class Signal {
             if(this.dirty) {
                 this.value = val
                 this.dirty = false
-                this.modified = true
+                Signal.modified.add(this)
             }
-            Signal.watcher.forEach((l) => l.get())
+            Signal.watcher.forEach(l => l.get())
         }
         get() {
             let active = Signal.curent()
@@ -33,7 +34,6 @@ export class Signal {
         }
         makeDirty() {
             this.dirty = true
-            this.modified = false
             this.sinks.forEach(s => s.makeDirty())
         }
         verifyPrimaryNode() {
@@ -51,9 +51,9 @@ export class Signal {
             this.sources = new Set()
             this.callback = callback
             this.dirty = true
-            this.modified = false
         }
         get() {
+            if(!Signal.origin) Signal.origin = this
             let active = Signal.curent()
             if (active) {
                 this.sinks.add(active);
@@ -62,6 +62,10 @@ export class Signal {
             }
             if (this.dirty) {
                 this.verifyPrimaryNode()
+            }
+            if(this == Signal.origin) {
+                Signal.modified.clear()
+                Signal.origin = null
             }
             return this.value;
         }
@@ -74,15 +78,13 @@ export class Signal {
                 this.sinks.forEach(l => l.noCalcNeed())
             } else {
                 this.value = val
-                this.modified = true
+                Signal.modified.add(this)
             }
             Signal.consumers.pop()
             this.dirty = false
         }
         noCalcNeed() {
-            let foundOneMod = false
-            this.sources.forEach(s => { if(s.modified) { foundOneMod = true; }})
-            if(foundOneMod) return
+            if(this.sources.intersection(Signal.modified).size) return
             this.dirty = false
             this.modified = false
             this.sinks.forEach(l => l.noCalcNeed())
