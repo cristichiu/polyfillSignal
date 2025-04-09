@@ -1,4 +1,4 @@
-import { State, Computed } from "./state.js"
+import { State, Computed } from "../state.js"
 
 const max = new State(0)
 const random1 = new Computed(() => {

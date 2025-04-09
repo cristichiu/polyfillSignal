@@ -1,109 +1,128 @@
-class State {
-    constructor(val = null) {
-        this.value = val
-        this.sinks = []
-        this.sources = []
-        this.dirty = false
-        this.modified = true
+class Signal {
+    static consumers = []
+    static curent = () => {
+        return Signal.consumers[Signal.consumers.length-1] || null
     }
-    set(val) {
-        if(this.value === val) {
-            this.modified = false
+    static State = class {
+        constructor(val) {
+            this.value = val
+            this.sinks = new Set()
             this.dirty = false
-            return
+            this.node = null
         }
-        this.setDirtyFlags()
-        this.value = val
-        this.dirty = false
-        this.modified = true
-        for(let i=0; i<this.sinks.length; i++) this.sinks[i].update()
-    }
-    setDirtyFlags() {
-        if(this.dirty) return
-        this.dirty = true
-        this.modified = false
-        for(let i=0; i<this.sinks.length; i++) this.sinks[i].setDirtyFlags()
-    }
-    get() {
-        if(this.dirty) {
-            const error = new Error("Dirty variable detected. Something went wrong!")
-            error.name = "InternalError"
-            throw error
+        set(val) {
+            if(this.value === val) return
+            this.makeDirty()
+            if(this.dirty) {
+                this.value = val
+                this.dirty = false
+            }
         }
-        return this.value
+        get() {
+            let active = Signal.curent()
+            if(active) {
+                this.sinks.add(active)
+                active.sources.add(this)
+                if(!active.node) active.node = this
+            }
+            return this.value
+        }
+        makeDirty() {
+            this.dirty = true
+            this.sinks.forEach(s => s.makeDirty())
+        }
+        verifyPrimaryNode() {
+            if(this.node && this.node.dirty) {
+                this.node.verifyPrimaryNode()
+                this.makeClean()
+            } else {
+                if(this.dirty) this.makeClean()
+            }
+        }
     }
-    addSinks(sink) { this.sinks.push(sink) }
-    addSources(source) { this.sources.push(source) }
+    static Computed = class extends Signal.State {
+        constructor(callback) {
+            super()
+            this.sources = new Set()
+            this.callback = callback
+            this.dirty = true
+        }
+        get() {
+            let active = Signal.curent()
+            if (active) {
+                this.sinks.add(active);
+                active.sources.add(this);
+                if(!active.node) active.node = this
+            }
+            if (this.dirty) {
+                this.verifyPrimaryNode()
+            }
+            return this.value;
+        }
+        makeClean() {
+            if(!this.dirty) return
+            Signal.consumers.push(this)
+            this.node = null
+            let val = this.callback()
+            if(val === this.value) this.noCalcNeed()
+            this.value = val
+            Signal.consumers.pop()
+            this.dirty = false
+        }
+        noCalcNeed() {
+            this.dirty = false
+            this.sinks.forEach(l => l.noCalcNeed())
+        }
+    }
 }
 
-class Computed extends State {
-    constructor(callback, sources = []) {
-        super()
-        this.callback = callback
-        this.value = this.callback()
-        for(let i=0; i<sources.length; i++) {
-            this.addSources(sources[i])
-            sources[i].addSinks(this)
-        }
-    }
-    update() {
-        if(!this.dirty) return
-        let stillHasDirtySources = false
-        for(let i=0; i<this.sources.length; i++) if(this.sources[i].dirty) { stillHasDirtySources = true; break }
-        if(stillHasDirtySources) return
-        let sourcesModified = false
-        for(let i=0; i<this.sources.length; i++) if(this.sources[i].modified) { sourcesModified = true; break }
-        let val = (sourcesModified && !this.modified && this.dirty) ? this.callback() : this.value
-        this.set(val)
-        for (let i = 0; i < this.sinks.length; i++) this.sinks[i].update()
-    }
-}
+// const { Signal } = require("signal-polyfill")
 
-// let st = new State(0)
-// let cm = new Computed(() => { console.log("executed_cm"); return st.get() < 10 }, [st])
-// let cm2 = new Computed(() => { console.log("executed_cm2"); return cm.get() ? "Is less then 10" : "Is greater or equal to 10" }, [cm])
-// let cm3 = new Computed(() => { console.log("executed_cm3"); return cm.get() ? "haha" : "hihi" }, [cm])
-// st.set(15)
-
-// console.log('init')
-// const n = new State(0)
-// const isOdd = new Computed(() => { console.log(1); return n.get() % 2 }, [n])
-// const result = new Computed(() => { console.log(2); return isOdd.get() ? "odd" : "even" }, [isOdd])
-// const a = new Computed(() => {
+// const a = new Signal.State(0)
+// const b = new Signal.Computed(() => { console.log(1); return !(a.get()%2) })
+// const c = new Signal.Computed(() => { console.log(2); return b.get() ? "even":"odd" })
+// const s = new Signal.Computed(() => {
 //     console.log(3)
-//     return `${n.get()} ${result.get()}`
-// }, [result, n])
-// console.log("set from 0 to 1")
-// n.set(1)
-// console.log("set from 1 to 3")
-// n.set(3)
+//     return c.get()
+// })
+// console.log(s.get())
+// a.set(1)
+// console.log(s.get())
 
-// const a = new State(0)
-// const b = new State(0)
-// const sum = new Computed(() => { console.log(1); return a.get() + b.get() }, [a, b])
-// const isOdd = new Computed(() => { console.log(2); return sum.get() % 2 }, [sum])
-// const result = new Computed(() => { console.log(3); return isOdd.get() ? "odd" : "even" }, [isOdd])
-// const calc = new Computed(() => {
+// const a = new Signal.State(0)
+// const b = new Signal.State(1)
+// const c = new Signal.State(2)
+// const a1 = new Signal.Computed(() => { console.log("a"); return a.get() })
+// const b1 = new Signal.Computed(() => { console.log("b"); return b.get() })
+// const c1 = new Signal.Computed(() => { console.log("c"); return c.get() })
+
+// const r = new Signal.Computed(() => {
+//     console.log("r")
+//     if(a1.get()) {
+//         return b1.get()
+//     } else {
+//         return c1.get()
+//     }
+// })
+// r.get()
+// a.set(1)
+// r.get()
+
+// const a = new Signal.State(0)
+// const b = new Signal.State(0)
+// const sum = new Signal.Computed(() => { console.log(1); return a.get() + b.get() })
+// const isOdd = new Signal.Computed(() => { console.log(2); return sum.get() % 2 })
+// const result = new Signal.Computed(() => { console.log(3); return isOdd.get() ? "odd" : "even" })
+// const calc = new Signal.Computed(() => {
 //     console.log(4)
 //     return `Sum of ${a.get()} and ${b.get()} is ${sum.get()} and it is ${result.get()}`
-// }, [a, b, result, sum])
-// const display = new Computed(() => {
-//     console.log(calc.get())
+// })
+// const display = new Signal.Computed(() => {
+//     console.log(5)
 //     return calc.get()
-// }, [calc])
-// a.set(2)
-// b.set(3)
+// })
 
-// const a = new State(0)
-// const b = new Computed(() => { console.log(1); return a.get()*2 }, [a])
-// const c = new Computed(() => { console.log(2); return b.get()*2 }, [b])
-// b.addSources(c)
-// c.addSinks(b)
+// console.log(display.get())
 // a.set(1)
-
-// const a = new State(0)
-// const b = new Computed(() => { console.log(1); return a.get()+1 }, [a])
-// const c = new Computed(() => { console.log(2); return a.get()+2 }, [a])
-// const d = new Computed(() => { console.log(3); return b.get()+c.get() }, [b,c])
-// new Computed(() => { console.log("result", d.get()) }, [d])
-// a.set(1)
+// b.set(2)
+// console.log(display.get())

@@ -1,4 +1,4 @@
-import { Computed,State } from "./state.js"
+import { Computed,State } from "../state.js"
 
 const task = new State("")
 const tasks = new State([])

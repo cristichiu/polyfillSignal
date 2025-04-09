@@ -1,4 +1,4 @@
-import { Computed,State } from "./state.js"
+import { Computed,State } from "../state.js"
 
 const n = new State(0)
 const isOdd = new Computed(() => { return n.get() % 2 }, [n])
